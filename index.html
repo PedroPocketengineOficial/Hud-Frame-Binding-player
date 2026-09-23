@@ -28,6 +28,8 @@
         #output { height: 140px; color: #64b5f6; }
         .info { background: #1e1e1e; border-left: 3px solid #4caf50; padding: 8px; margin-top: 8px; font-size: 11px; color: #aaa; border-radius: 0 4px 4px 0; }
         .info code { color: #fff; background: #2a2a2a; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+        .checkbox-group { display: flex; gap: 12px; margin: 6px 0 10px; align-items: center; }
+        .checkbox-group label { display: flex; align-items: center; gap: 4px; cursor: pointer; color: #4caf50; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -64,6 +66,12 @@
             <label for="evtStop">ScriptEvent Parar:</label>
             <input type="text" id="evtStop" value="hud:stop" placeholder="Ex: hud:stop">
         </div>
+    </div>
+
+    <!-- Opções de Limpeza de Frames -->
+    <div class="checkbox-group">
+        <label><input type="checkbox" id="removeDupes" checked> Remover Duplicados</label>
+        <label><input type="checkbox" id="sortFrames" checked> Ordenar Numericamente (1, 2, 3...)</label>
     </div>
 
     <label for="jsonInput">HUD JSON Input:</label>
@@ -116,6 +124,9 @@
             const evtStart = document.getElementById('evtStart').value.trim() || 'hud:start';
             const evtStop = document.getElementById('evtStop').value.trim() || 'hud:stop';
 
+            const removeDupes = document.getElementById('removeDupes').checked;
+            const sortFrames = document.getElementById('sortFrames').checked;
+
             document.getElementById('lblStart').textContent = '/scriptevent ' + evtStart;
             document.getElementById('lblStop').textContent = '/scriptevent ' + evtStop;
 
@@ -123,7 +134,7 @@
 
             try {
                 const jsonObj = JSON.parse(raw);
-                const frames = [];
+                let frames = [];
 
                 for (const key in jsonObj) {
                     const item = jsonObj[key];
@@ -148,6 +159,23 @@
 
                 if (frames.length === 0) {
                     return alert('Nenhuma imagem válida foi encontrada no JSON.');
+                }
+
+                // Filtrar duplicados
+                if (removeDupes) {
+                    frames = [...new Set(frames)];
+                }
+
+                // Ordenação numérica (ex: jump_1, jump_2, jump_3 ...)
+                if (sortFrames) {
+                    frames.sort((a, b) => {
+                        const numA = parseInt((a.match(/\d+$/) || [0])[0], 10);
+                        const numB = parseInt((b.match(/\d+$/) || [0])[0], 10);
+                        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+                            return numA - numB;
+                        }
+                        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+                    });
                 }
 
                 const jsCode = generateScript(frames, selector, ticks, isLoop, evtStart, evtStop);
@@ -244,6 +272,38 @@ console.warn("[HUD Script API 2.10.0] Carregado. Use /scriptevent " + EVENT_STAR
                 document.execCommand('copy');
                 alert('Código copiado para a área de transferência!');
             }
+        }
+
+        function downloadJS() {
+            const text = document.getElementById('output').value;
+            if (!text) return alert('Gere o script primeiro antes de baixar!');
+
+            const filename = 'main.js';
+            const blob = new Blob([text], { type: 'text/javascript;charset=utf-8' });
+
+            if (navigator.msSaveBlob) {
+                navigator.msSaveBlob(blob, filename);
+                return;
+            }
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            
+            document.body.appendChild(a);
+            a.click();
+
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }
+    </script>
+</body>
+</html>
+
         }
 
         function downloadJS() {
