@@ -70,7 +70,7 @@
 
     <!-- Opções de Limpeza de Frames -->
     <div class="checkbox-group">
-        <label><input type="checkbox" id="removeDupes" checked> Remover Duplicados</label>
+        <label><input type="checkbox" id="removeDupes" checked> Remover Duplicados e Vazios</label>
         <label><input type="checkbox" id="sortFrames" checked> Ordenar Numericamente (1, 2, 3...)</label>
     </div>
 
@@ -153,13 +153,15 @@
                             }
                         }
 
-                        frames.push(frameName || key);
+                        const targetFrame = (frameName || key).trim();
+                        if (targetFrame.length > 0) {
+                            frames.push(targetFrame);
+                        }
                     }
                 }
 
-                if (frames.length === 0) {
-                    return alert('Nenhuma imagem válida foi encontrada no JSON.');
-                }
+                // Filtrar entradas vazias, nulas ou compostas apenas por espaços
+                frames = frames.filter(f => f && typeof f === 'string' && f.trim().length > 0);
 
                 // Filtrar duplicados
                 if (removeDupes) {
@@ -176,6 +178,10 @@
                         }
                         return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
                     });
+                }
+
+                if (frames.length === 0) {
+                    return alert('Nenhuma imagem válida foi encontrada no JSON.');
                 }
 
                 const jsCode = generateScript(frames, selector, ticks, isLoop, evtStart, evtStop);
@@ -295,41 +301,6 @@ console.warn("[HUD Script API 2.10.0] Carregado. Use /scriptevent " + EVENT_STAR
             document.body.appendChild(a);
             a.click();
 
-            setTimeout(() => {
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }, 100);
-        }
-    </script>
-</body>
-</html>
-
-        }
-
-        function downloadJS() {
-            const text = document.getElementById('output').value;
-            if (!text) return alert('Gere o script primeiro antes de baixar!');
-
-            const filename = 'main.js';
-            const blob = new Blob([text], { type: 'text/javascript;charset=utf-8' });
-
-            // Suporte para navegadores antigos / Edge antigo
-            if (navigator.msSaveBlob) {
-                navigator.msSaveBlob(blob, filename);
-                return;
-            }
-
-            // Método universal usando URL e tag <a> invisível
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = filename;
-            
-            document.body.appendChild(a);
-            a.click();
-
-            // Limpeza da memória
             setTimeout(() => {
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
