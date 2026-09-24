@@ -17,7 +17,7 @@
         input:focus, select:focus, textarea:focus { border-color: #4caf50; }
         .row { display: flex; gap: 8px; margin-bottom: 6px; }
         .col { flex: 1; }
-        textarea { height: 100px; resize: vertical; }
+        textarea { height: 90px; resize: vertical; }
         .btn-group { display: flex; gap: 8px; margin: 10px 0; }
         button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; }
         .btn-import { background: #9c27b0; color: #fff; }
@@ -26,6 +26,7 @@
         .btn-dl { background: #ff9800; color: #fff; }
         .btn-danger { background: #f44336; color: #fff; }
         .btn-reset { background: #607d8b; color: #fff; }
+        .btn-sm { padding: 4px 8px; font-size: 11px; }
         #fileInput { display: none; }
         #output { height: 120px; color: #64b5f6; }
         .info { background: #1e1e1e; border-left: 3px solid #4caf50; padding: 8px; margin-top: 8px; font-size: 11px; color: #aaa; border-radius: 0 4px 4px 0; }
@@ -33,12 +34,13 @@
         .checkbox-group { display: flex; gap: 12px; margin: 6px 0 10px; align-items: center; }
         .checkbox-group label { display: flex; align-items: center; gap: 4px; cursor: pointer; color: #4caf50; font-size: 11px; }
         
-        /* Painel de Edição de Frames */
+        /* Gerenciador Visual de Frames (Chips) */
         .frame-editor { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 10px; margin: 10px 0; display: none; }
-        .frame-editor select { height: 120px; background: #121212; color: #fff; border-color: #444; }
-        .frame-editor option { padding: 4px; border-bottom: 1px solid #222; }
-        .frame-editor option:checked { background: #e91e63 !important; color: #fff; }
-        .editor-hint { font-size: 10px; color: #888; margin-bottom: 6px; }
+        .frame-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 160px; overflow-y: auto; padding: 6px; background: #121212; border: 1px solid #282828; border-radius: 4px; margin-top: 6px; }
+        .chip { display: inline-flex; align-items: center; gap: 6px; background: #2a2a2a; color: #00ff66; border: 1px solid #444; border-radius: 4px; padding: 4px 8px; font-family: monospace; font-size: 11px; }
+        .chip .chip-del { background: #f44336; color: #fff; border: none; border-radius: 3px; width: 16px; height: 16px; line-height: 16px; text-align: center; font-size: 10px; cursor: pointer; font-weight: bold; }
+        .chip .chip-del:hover { background: #d32f2f; }
+        .chip.selected { border-color: #f44336; background: #3d1c1c; }
     </style>
 </head>
 <body>
@@ -50,15 +52,15 @@
     <div class="row">
         <div class="col">
             <label for="selector">Seletor de Alvo:</label>
-            <input type="text" id="selector" value="@a" placeholder="Ex: @a, @p">
+            <input type="text" id="selector" value="@a" placeholder="Ex: @a, @p" oninput="updateScriptOutput()">
         </div>
         <div class="col">
             <label for="ticks">Intervalo (Ticks):</label>
-            <input type="number" id="ticks" value="2" min="1" placeholder="Ex: 2">
+            <input type="number" id="ticks" value="2" min="1" placeholder="Ex: 2" oninput="updateScriptOutput()">
         </div>
         <div class="col">
             <label for="loopOpt">Repetir (Loop):</label>
-            <select id="loopOpt">
+            <select id="loopOpt" onchange="updateScriptOutput()">
                 <option value="true" selected>Sim</option>
                 <option value="false">Não</option>
             </select>
@@ -69,11 +71,11 @@
     <div class="row">
         <div class="col">
             <label for="evtStart">ScriptEvent Iniciar:</label>
-            <input type="text" id="evtStart" value="hud:start" placeholder="Ex: hud:start">
+            <input type="text" id="evtStart" value="hud:start" placeholder="Ex: hud:start" oninput="updateScriptOutput()">
         </div>
         <div class="col">
             <label for="evtStop">ScriptEvent Parar:</label>
-            <input type="text" id="evtStop" value="hud:stop" placeholder="Ex: hud:stop">
+            <input type="text" id="evtStop" value="hud:stop" placeholder="Ex: hud:stop" oninput="updateScriptOutput()">
         </div>
     </div>
 
@@ -91,18 +93,20 @@
 
     <div class="btn-group">
         <button class="btn-import" onclick="document.getElementById('fileInput').click()">📁 Importar JSON</button>
-        <button class="btn-conv" onclick="convertHUD()">⚡ Gerar JS</button>
+        <button class="btn-conv" onclick="parseAndExtractJSON()">⚡ Extrair do JSON</button>
     </div>
 
-    <!-- Painel de Remoção Manual de Frames -->
+    <!-- Painel de Gerenciamento Visual de Frames -->
     <div class="frame-editor" id="frameEditorPanel">
-        <label for="frameSelect">Gerenciar Frames Extraídos (<span id="frameCount">0</span>):</label>
-        <p class="editor-hint">💡 Dica: No celular toque para selecionar vários. No PC segure <b>Ctrl</b> ou <b>Shift</b>.</p>
-        <select id="frameSelect" multiple></select>
-        <div class="btn-group" style="margin-bottom:0; margin-top:8px;">
-            <button class="btn-danger" onclick="removeSelectedFrames()">🗑️ Remover Selecionados</button>
-            <button class="btn-reset" onclick="convertHUD()">🔄 Restaurar Todos</button>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label style="margin:0;">Frames Ativos (<span id="frameCount">0</span>):</label>
+            <div style="display:flex; gap:4px;">
+                <button class="btn-reset btn-sm" onclick="parseAndExtractJSON()">🔄 Recarregar Original</button>
+            </div>
         </div>
+        <p style="font-size:10px; color:#888; margin-top:4px;">Toque no botão <b>X</b> de qualquer frame para excluí-lo individualmente.</p>
+        
+        <div class="frame-list" id="frameListContainer"></div>
     </div>
 
     <label for="output">Resultado JS (Script API):</label>
@@ -120,7 +124,8 @@
     </div>
 
     <script>
-        let currentFramesList = [];
+        // Memória do aplicativo para manter os frames filtrados
+        let activeFramesList = [];
 
         function handleFileImport(event) {
             const file = event.target.files[0];
@@ -130,6 +135,7 @@
             reader.onload = function(e) {
                 document.getElementById('jsonInput').value = e.target.result;
                 alert('Arquivo "' + file.name + '" carregado com sucesso!');
+                parseAndExtractJSON();
             };
             reader.onerror = function() {
                 alert('Erro ao ler o arquivo JSON!');
@@ -137,20 +143,11 @@
             reader.readAsText(file);
         }
 
-        function convertHUD() {
+        // Extrai o JSON inicial e limpa os dados
+        function parseAndExtractJSON() {
             const raw = document.getElementById('jsonInput').value.trim();
-            const selector = document.getElementById('selector').value.trim() || '@a';
-            const ticks = parseInt(document.getElementById('ticks').value) || 2;
-            const isLoop = document.getElementById('loopOpt').value === 'true';
-            
-            const evtStart = document.getElementById('evtStart').value.trim() || 'hud:start';
-            const evtStop = document.getElementById('evtStop').value.trim() || 'hud:stop';
-
             const removeDupes = document.getElementById('removeDupes').checked;
             const sortFrames = document.getElementById('sortFrames').checked;
-
-            document.getElementById('lblStart').textContent = '/scriptevent ' + evtStart;
-            document.getElementById('lblStop').textContent = '/scriptevent ' + evtStop;
 
             if (!raw) return alert('Por favor, cole o conteúdo ou importe um arquivo JSON válido.');
 
@@ -203,8 +200,9 @@
                     return alert('Nenhuma imagem válida foi encontrada no JSON.');
                 }
 
-                currentFramesList = frames;
-                updateFrameSelectUI();
+                // Armazena na memória principal
+                activeFramesList = frames;
+                renderFrameChips();
                 updateScriptOutput();
 
             } catch (e) {
@@ -212,38 +210,33 @@
             }
         }
 
-        function updateFrameSelectUI() {
-            const select = document.getElementById('frameSelect');
-            const panel = document.getElementById('frameEditorPanel');
-            const countLbl = document.getElementById('frameCount');
-            
-            select.innerHTML = '';
-            currentFramesList.forEach((frame, index) => {
-                const opt = document.createElement('option');
-                opt.value = index;
-                opt.textContent = `${index + 1}. ${frame}`;
-                select.appendChild(opt);
-            });
-
-            countLbl.textContent = currentFramesList.length;
-            panel.style.display = currentFramesList.length > 0 ? 'block' : 'none';
-        }
-
-        function removeSelectedFrames() {
-            const select = document.getElementById('frameSelect');
-            const selectedIndexes = Array.from(select.selectedOptions).map(opt => parseInt(opt.value));
-
-            if (selectedIndexes.length === 0) {
-                return alert('Selecione pelo menos um frame na lista para remover!');
-            }
-
-            // Filtrar removendo os índices selecionados
-            currentFramesList = currentFramesList.filter((_, index) => !selectedIndexes.includes(index));
-
-            updateFrameSelectUI();
+        // Remove um frame específico clicado no botão X
+        function deleteSingleFrame(index) {
+            activeFramesList.splice(index, 1);
+            renderFrameChips();
             updateScriptOutput();
         }
 
+        // Renderiza os "Chips/Tags" visuais dos frames
+        function renderFrameChips() {
+            const container = document.getElementById('frameListContainer');
+            const panel = document.getElementById('frameEditorPanel');
+            const countLbl = document.getElementById('frameCount');
+
+            container.innerHTML = '';
+            
+            activeFramesList.forEach((frame, idx) => {
+                const chip = document.createElement('div');
+                chip.className = 'chip';
+                chip.innerHTML = `<span>${frame}</span> <button class="chip-del" title="Excluir" onclick="deleteSingleFrame(${idx})">✕</button>`;
+                container.appendChild(chip);
+            });
+
+            countLbl.textContent = activeFramesList.length;
+            panel.style.display = activeFramesList.length > 0 ? 'block' : 'none';
+        }
+
+        // Atualiza o script impresso na área de texto sem reiniciar a lista
         function updateScriptOutput() {
             const selector = document.getElementById('selector').value.trim() || '@a';
             const ticks = parseInt(document.getElementById('ticks').value) || 2;
@@ -251,7 +244,10 @@
             const evtStart = document.getElementById('evtStart').value.trim() || 'hud:start';
             const evtStop = document.getElementById('evtStop').value.trim() || 'hud:stop';
 
-            const jsCode = generateScript(currentFramesList, selector, ticks, isLoop, evtStart, evtStop);
+            document.getElementById('lblStart').textContent = '/scriptevent ' + evtStart;
+            document.getElementById('lblStop').textContent = '/scriptevent ' + evtStop;
+
+            const jsCode = generateScript(activeFramesList, selector, ticks, isLoop, evtStart, evtStop);
             document.getElementById('output').value = jsCode;
         }
 
