@@ -17,19 +17,28 @@
         input:focus, select:focus, textarea:focus { border-color: #4caf50; }
         .row { display: flex; gap: 8px; margin-bottom: 6px; }
         .col { flex: 1; }
-        textarea { height: 110px; resize: vertical; }
+        textarea { height: 100px; resize: vertical; }
         .btn-group { display: flex; gap: 8px; margin: 10px 0; }
         button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; }
         .btn-import { background: #9c27b0; color: #fff; }
         .btn-conv { background: #4caf50; color: #fff; }
         .btn-copy { background: #2196f3; color: #fff; }
         .btn-dl { background: #ff9800; color: #fff; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-reset { background: #607d8b; color: #fff; }
         #fileInput { display: none; }
-        #output { height: 140px; color: #64b5f6; }
+        #output { height: 120px; color: #64b5f6; }
         .info { background: #1e1e1e; border-left: 3px solid #4caf50; padding: 8px; margin-top: 8px; font-size: 11px; color: #aaa; border-radius: 0 4px 4px 0; }
         .info code { color: #fff; background: #2a2a2a; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
         .checkbox-group { display: flex; gap: 12px; margin: 6px 0 10px; align-items: center; }
         .checkbox-group label { display: flex; align-items: center; gap: 4px; cursor: pointer; color: #4caf50; font-size: 11px; }
+        
+        /* Painel de Edição de Frames */
+        .frame-editor { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 10px; margin: 10px 0; display: none; }
+        .frame-editor select { height: 120px; background: #121212; color: #fff; border-color: #444; }
+        .frame-editor option { padding: 4px; border-bottom: 1px solid #222; }
+        .frame-editor option:checked { background: #e91e63 !important; color: #fff; }
+        .editor-hint { font-size: 10px; color: #888; margin-bottom: 6px; }
     </style>
 </head>
 <body>
@@ -85,6 +94,17 @@
         <button class="btn-conv" onclick="convertHUD()">⚡ Gerar JS</button>
     </div>
 
+    <!-- Painel de Remoção Manual de Frames -->
+    <div class="frame-editor" id="frameEditorPanel">
+        <label for="frameSelect">Gerenciar Frames Extraídos (<span id="frameCount">0</span>):</label>
+        <p class="editor-hint">💡 Dica: No celular toque para selecionar vários. No PC segure <b>Ctrl</b> ou <b>Shift</b>.</p>
+        <select id="frameSelect" multiple></select>
+        <div class="btn-group" style="margin-bottom:0; margin-top:8px;">
+            <button class="btn-danger" onclick="removeSelectedFrames()">🗑️ Remover Selecionados</button>
+            <button class="btn-reset" onclick="convertHUD()">🔄 Restaurar Todos</button>
+        </div>
+    </div>
+
     <label for="output">Resultado JS (Script API):</label>
     <textarea id="output" readonly placeholder="O script gerado aparecerá aqui..."></textarea>
 
@@ -100,6 +120,8 @@
     </div>
 
     <script>
+        let currentFramesList = [];
+
         function handleFileImport(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -160,15 +182,12 @@
                     }
                 }
 
-                // Filtrar entradas vazias, nulas ou compostas apenas por espaços
                 frames = frames.filter(f => f && typeof f === 'string' && f.trim().length > 0);
 
-                // Filtrar duplicados
                 if (removeDupes) {
                     frames = [...new Set(frames)];
                 }
 
-                // Ordenação numérica (ex: jump_1, jump_2, jump_3 ...)
                 if (sortFrames) {
                     frames.sort((a, b) => {
                         const numA = parseInt((a.match(/\d+$/) || [0])[0], 10);
@@ -184,11 +203,56 @@
                     return alert('Nenhuma imagem válida foi encontrada no JSON.');
                 }
 
-                const jsCode = generateScript(frames, selector, ticks, isLoop, evtStart, evtStop);
-                document.getElementById('output').value = jsCode;
+                currentFramesList = frames;
+                updateFrameSelectUI();
+                updateScriptOutput();
+
             } catch (e) {
                 alert('Erro ao processar JSON: ' + e.message);
             }
+        }
+
+        function updateFrameSelectUI() {
+            const select = document.getElementById('frameSelect');
+            const panel = document.getElementById('frameEditorPanel');
+            const countLbl = document.getElementById('frameCount');
+            
+            select.innerHTML = '';
+            currentFramesList.forEach((frame, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.textContent = `${index + 1}. ${frame}`;
+                select.appendChild(opt);
+            });
+
+            countLbl.textContent = currentFramesList.length;
+            panel.style.display = currentFramesList.length > 0 ? 'block' : 'none';
+        }
+
+        function removeSelectedFrames() {
+            const select = document.getElementById('frameSelect');
+            const selectedIndexes = Array.from(select.selectedOptions).map(opt => parseInt(opt.value));
+
+            if (selectedIndexes.length === 0) {
+                return alert('Selecione pelo menos um frame na lista para remover!');
+            }
+
+            // Filtrar removendo os índices selecionados
+            currentFramesList = currentFramesList.filter((_, index) => !selectedIndexes.includes(index));
+
+            updateFrameSelectUI();
+            updateScriptOutput();
+        }
+
+        function updateScriptOutput() {
+            const selector = document.getElementById('selector').value.trim() || '@a';
+            const ticks = parseInt(document.getElementById('ticks').value) || 2;
+            const isLoop = document.getElementById('loopOpt').value === 'true';
+            const evtStart = document.getElementById('evtStart').value.trim() || 'hud:start';
+            const evtStop = document.getElementById('evtStop').value.trim() || 'hud:stop';
+
+            const jsCode = generateScript(currentFramesList, selector, ticks, isLoop, evtStart, evtStop);
+            document.getElementById('output').value = jsCode;
         }
 
         function generateScript(frames, selector, ticks, isLoop, evtStart, evtStop) {
